@@ -108,8 +108,9 @@ void WaitBLEClientConnection(void)
   OLEDDisplayStatus("WAIT FOR BLE CLIENT");
   while(!SerialBT.connected())
   {
-    SYSTEM_STATE = BLE_CLIENT_CONNECTED;
+    // Waiting for BLE client
   }
+  SYSTEM_STATE = BLE_CLIENT_CONNECTED;
 }
 
 char* BLEClientConnected(void)
@@ -308,7 +309,7 @@ char* BluetoothReceive(void)
   uint8_t index = 0;
   char c;
   static char buffer[64];
-  while(SerialBT.available()) 
+  while(SerialBT.available())
   {
     c = SerialBT.read();
     if(c == '\n')
@@ -316,6 +317,11 @@ char* BluetoothReceive(void)
       buffer[index]     = 10;
       buffer[index + 1] = '\0';
       return buffer;
+    }
+    if(index >= sizeof(buffer) - 2)
+    {
+      // Buffer full without newline — discard and signal no command
+      return NULL;
     }
     buffer[index] = c;
     index++;
@@ -486,7 +492,9 @@ void OLEDScrollTextUp(const char* data)
     lines = data_len / horizontal_chars;
   }
   if(lines == 0) lines = 1;
-      
+  int max_lines = SCREEN_HEIGHT / LINE_HEIGHT;
+  if(lines > max_lines) lines = max_lines;
+
   if (display.getCursorY() >= SCREEN_HEIGHT - lines*LINE_HEIGHT + 1) 
   {
     for (int y = 0; y < SCREEN_HEIGHT; y++) 
@@ -526,11 +534,12 @@ void SDOpenFile(const char* file_name)
   }
   else
   {
-    while(file_name[9+i] != 10)
+    while(file_name[9+i] != 10 && file_name[9+i] != '\0' && i < sizeof(buffer) - 1)
     {
       buffer[i] = file_name[9+i];
       i++;
     }
+    buffer[i] = '\0';
     readFile(SD, buffer);
   }
 }
@@ -545,22 +554,27 @@ void SDDeleteFile(const char* file_name)
   }
   else
   {
-    while(file_name[9+i] != 10)
+    while(file_name[9+i] != 10 && file_name[9+i] != '\0' && i < sizeof(buffer) - 1)
     {
       buffer[i] = file_name[9+i];
       i++;
     }
+    buffer[i] = '\0';
     deleteFile(SD, buffer);
   }
-
 }
 
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels)
 {
   char buffer[2048] = "";
   char data[32] = "";
-  sprintf(buffer, "\nListing directory: %s\n", dirname);
-  SerialBT.write((uint8_t*)buffer, strlen(buffer) - 1);
+  size_t buf_size = sizeof(buffer);
+  size_t used = 0;
+
+  snprintf(buffer, buf_size, "\nListing directory: %s\n", dirname);
+  SerialBT.write((uint8_t*)buffer, strlen(buffer));
+  buffer[0] = '\0';
+  used = 0;
 
   File root = fs.open(dirname);
   if(!root)
@@ -573,33 +587,39 @@ void listDir(fs::FS &fs, const char * dirname, uint8_t levels)
     Serial.println("Not a directory");
     return;
   }
-  
+
   File file = root.openNextFile();
   while(file)
   {
     if(file.isDirectory())
     {
-      strcpy(buffer, "\n  DIR : ");
-      strcat(buffer, file.name());
-      strcat(buffer, "\n");
+      snprintf(buffer + used, buf_size - used, "\n  DIR : %s\n", file.name());
+      used = strlen(buffer);
 
       if(levels)
       {
-        listDir(fs, file.name(), levels -1);
+        listDir(fs, file.name(), levels - 1);
       }
-    } 
-    else 
+    }
+    else
     {
-      strcat(buffer, "  FILE: ");
-      strcat(buffer, file.name());
-      strcat(buffer, "  SIZE: ");
-      sprintf(data, "%d", file.size());
-      strcat(buffer, data);
-      strcat(buffer, "\n");
+      snprintf(data, sizeof(data), "%d", (int)file.size());
+      snprintf(buffer + used, buf_size - used, "  FILE: %s  SIZE: %s\n", file.name(), data);
+      used = strlen(buffer);
+    }
+    // Flush if buffer is getting full (leave 128 bytes headroom)
+    if(used >= buf_size - 128)
+    {
+      SerialBT.write((uint8_t*)buffer, used);
+      buffer[0] = '\0';
+      used = 0;
     }
     file = root.openNextFile();
   }
-  SerialBT.write((uint8_t*)buffer, strlen(buffer) - 1);
+  if(used > 0)
+  {
+    SerialBT.write((uint8_t*)buffer, used);
+  }
 }
 
 void readFile(fs::FS &fs, const char * path)
@@ -660,9 +680,8 @@ void deleteFile(fs::FS &fs, const char * path)
 
 void SDPrintNoCardError(void)
 {
-  char buffer[32];
-  strcat(buffer, "SD card is not inserted\n");
-  SerialBT.write((uint8_t*)buffer, strlen(buffer));
+  const char* msg = "SD card is not inserted\n";
+  SerialBT.write((uint8_t*)msg, strlen(msg));
 }
 
 /* MISC FUNCTIONS */
