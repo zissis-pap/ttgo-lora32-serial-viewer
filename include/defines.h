@@ -24,4 +24,8 @@
 #define SD_MOSI       15
 #define SD_MISO       2
 
+/* UART Configuration Wizard */
+#define NUM_BAUD_OPTIONS    5
+#define NUM_PARITY_OPTIONS  2
+
 #endif

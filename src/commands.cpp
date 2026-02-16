@@ -8,6 +8,37 @@
 #include "sd_card.h"
 #include "oled.h"
 #include "main.h"
+#include "setup.h"
+#include "defines.h"
+
+static uint8_t WaitForUARTChoice(uint8_t max_choice)
+{
+  while (SerialBT.connected())
+  {
+    char* input = BluetoothReceive();
+    if (input != NULL)
+    {
+      int choice = atoi(input);
+      if (choice >= 1 && choice <= max_choice)
+        return (uint8_t)choice;
+      SerialBT.println("Invalid selection. Try again.");
+    }
+  }
+  return 0;
+}
+
+static void ConfigureUARTWizard(void)
+{
+  SerialBT.println("\nSelect baud rate:\n  1: 115200\n  2: 57600\n  3: 38400\n  4: 19200\n  5: 9600");
+  uint8_t baud_choice = WaitForUARTChoice(NUM_BAUD_OPTIONS);
+  if (baud_choice == 0) return;
+
+  SerialBT.println("\nSelect parity:\n  1: None\n  2: Even");
+  uint8_t parity_choice = WaitForUARTChoice(NUM_PARITY_OPTIONS);
+  if (parity_choice == 0) return;
+
+  ConfigureUART(baud_choice, parity_choice);
+}
 
 char* CheckForCommand(void)
 {
@@ -62,6 +93,7 @@ void ExecuteCommand(char* command)
         SDDeleteFile(command);
         break;
       case SET_BAUD_RATE:
+        ConfigureUARTWizard();
         break;
       default:
         Serial.println("Default");

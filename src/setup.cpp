@@ -107,3 +107,33 @@ void SDSetup(void)
     display_ok();
   }
 }
+
+static const uint32_t baud_options[]   = {115200, 57600, 38400, 19200, 9600};
+static const uint32_t parity_options[] = {SERIAL_8N1, SERIAL_8E1};
+static const char*    baud_labels[]    = {"115200", "57600", "38400", "19200", "9600"};
+static const char*    parity_labels[]  = {"None", "Even"};
+
+void ConfigureUART(uint8_t baud_choice, uint8_t parity_choice)
+{
+  if (baud_choice < 1 || baud_choice > NUM_BAUD_OPTIONS)
+  {
+    SerialBT.println("Error: invalid baud rate selection.");
+    return;
+  }
+  if (parity_choice < 1 || parity_choice > NUM_PARITY_OPTIONS)
+  {
+    SerialBT.println("Error: invalid parity selection.");
+    return;
+  }
+
+  uint32_t baud   = baud_options[baud_choice - 1];
+  uint32_t config = parity_options[parity_choice - 1];
+
+  Serial.end();
+  Serial.begin(baud, config);
+
+  char msg[64];
+  snprintf(msg, sizeof(msg), "UART configured: %s baud, %s parity",
+           baud_labels[baud_choice - 1], parity_labels[parity_choice - 1]);
+  SerialBT.println(msg);
+}
