@@ -1,4 +1,4 @@
-# ESP32 Serial Viewer
+# TTGO Lora32 Serial Viewer
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![PlatformIO](https://img.shields.io/badge/Built%20with-PlatformIO-orange.svg)](https://platformio.org/)
